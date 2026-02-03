@@ -1,0 +1,1 @@
+# git-worktree-zsh-plugin
