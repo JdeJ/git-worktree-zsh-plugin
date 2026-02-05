@@ -417,6 +417,25 @@ If `wtrm` can't find worktree:
 - **Workspaces**: Each worktree becomes its own workspace
 - **Extensions**: Your setup works everywhere automatically
 
+## Claude Tip
+
+When creating a new workspace we are adding a new project configuration to the .claude.json file, so we loose our current project configurations including the mcp's. You can create a file called **.mcp.json** in your project base folder and add there all the mcp's server you want to share between all your worktrees.
+```
+{
+  "mcpServers": {
+    "mcp_server_name": {
+      "type": "sse",
+      "url": "https://mcp_serser_url/sse"
+    }
+  }
+}
+```
+Remember to add this file to .gitgnore
+```
+# MCP configuration (contains sensitive credentials)
+.mcp.json
+```
+
 ## Contributing
 
 Improvements welcome! This plugin was crafted with obsessive attention to:
