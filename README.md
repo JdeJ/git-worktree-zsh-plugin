@@ -23,10 +23,10 @@ This plugin embodies the principle that great tools should be **invisible**—th
 
 ```bash
 # If you've symlinked (already done):
-# ~/.oh-my-zsh/custom/plugins/git-worktree -> ~/dev/git-worktree-zsh-plugin
+# ~/.oh-my-zsh/custom/plugins/git-worktree -> <path>/git-worktree-zsh-plugin
 
 # Or clone directly:
-git clone https://github.com/yourusername/git-worktree-zsh-plugin \
+git clone https://github.com/JdeJ/git-worktree-zsh-plugin \
   ~/.oh-my-zsh/custom/plugins/git-worktree
 ```
 
