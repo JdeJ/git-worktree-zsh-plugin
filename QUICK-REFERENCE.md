@@ -7,14 +7,14 @@ Visual cheat sheet for git worktree behavior and commands.
 ## Command Quick Reference
 
 ```bash
-wtn <branch> [base]  # Create branch + worktree + VSCode + Claude
-                     # Defaults to main/master if base not specified
-                     # Example: wtn hotfix-urgent main
-wtls                 # List all worktrees
-wtrm <branch>        # Remove worktree (ask about branch deletion)
-wtcd <branch>        # Jump to worktree directory
-wtprune              # Clean stale worktree metadata
-wtstatus             # Check system requirements
+wtn <branch> [base] # Create branch + worktree + VSCode + Claude
+# Defaults to main/master if base not specified
+# Example: wtn hotfix-urgent main
+wtls # List all worktrees
+wtrm <branch> # Remove worktree (ask about branch deletion)
+wtcd <branch> # Jump to worktree directory
+wtprune # Clean stale worktree metadata
+wtstatus # Check system requirements
 ```
 
 ---
@@ -26,28 +26,28 @@ wtstatus             # Check system requirements
 ```
 Your Current State:
 ┌─────────────────────────────┐
-│  You're on: feature-old     │
-│  Uncommitted changes: YES   │
-│  main branch: commit xyz    │
+│ You're on: feature-old │
+│ Uncommitted changes: YES │
+│ main branch: commit xyz │
 └─────────────────────────────┘
-                │
-                │  wtn feature-new
-                │  (auto-detects main)
-                ▼
+│
+│ wtn feature-new
+│ (auto-detects main)
+▼
 ┌─────────────────────────────┐
-│  Git creates:               │
-│  feature-new → commit xyz   │
-│  (from main, not feature-old!)│
+│ Git creates: │
+│ feature-new → commit xyz │
+│ (from main, not feature-old!)│
 └─────────────────────────────┘
-                │
-                ▼
+│
+▼
 ┌─────────────────────────────────────────┐
-│  Two separate working directories:      │
-│                                          │
-│  Original:                New Worktree: │
-│  ├── On: feature-old      ├── On: feature-new│
-│  ├── Changes: YES         ├── Changes: NO    │
-│  └── Files: modified      └── Files: clean   │
+│ Two separate working directories: │
+│ │
+│ Original: New Worktree: │
+│ ├── On: feature-old ├── On: feature-new│
+│ ├── Changes: YES ├── Changes: NO │
+│ └── Files: modified └── Files: clean │
 └─────────────────────────────────────────┘
 ```
 
@@ -55,9 +55,9 @@ Your Current State:
 
 ```bash
 # Specify base branch explicitly
-wtn hotfix-urgent main         # From main
-wtn experiment HEAD            # From current HEAD
-wtn feature-v2 feature-v1      # From another feature
+wtn hotfix-urgent main # From main
+wtn experiment HEAD # From current HEAD
+wtn feature-v2 feature-v1 # From another feature
 ```
 
 **Key Point:** Defaults to main/master. Your uncommitted work stays safe!
@@ -70,22 +70,22 @@ wtn feature-v2 feature-v1      # From another feature
 BEFORE wtn:
 project/
 ├── src/
-│   ├── auth.js       (modified, uncommitted)
-│   └── utils.js      (modified, uncommitted)
+│ ├── auth.js (modified, uncommitted)
+│ └── utils.js (modified, uncommitted)
 
 RUN: wtn feature-payments
 
 AFTER wtn:
 project/
 ├── src/
-│   ├── auth.js       (STILL modified, uncommitted) ✓
-│   └── utils.js      (STILL modified, uncommitted) ✓
+│ ├── auth.js (STILL modified, uncommitted) ✓
+│ └── utils.js (STILL modified, uncommitted) ✓
 │
 └── .worktrees/
-    └── feature-payments/
-        └── src/
-            ├── auth.js       (clean, committed version) ✓
-            └── utils.js      (clean, committed version) ✓
+└── feature-payments/
+└── src/
+├── auth.js (clean, committed version) ✓
+└── utils.js (clean, committed version) ✓
 ```
 
 **Your uncommitted work is NEVER touched.**
@@ -95,37 +95,44 @@ project/
 ## File System Layout
 
 ```
-project/                              # Main worktree
-├── .git/                             # Shared git database
-│   ├── objects/       ← ALL commits (shared)
-│   ├── refs/          ← ALL branches (shared)
-│   │   └── heads/
-│   │       ├── main
-│   │       └── feature-auth
-│   └── worktrees/     ← Worktree metadata
-│       └── feature-auth/
-│           ├── HEAD   ← Points to feature-auth
-│           └── index  ← Separate staging area
+project/ # Main worktree
+├── .git/ # Shared git database
+│ ├── objects/ ← ALL commits (shared)
+│ ├── refs/ ← ALL branches (shared)
+│ │ └── heads/
+│ │ ├── main
+│ │ ├── feature-auth
+│ │ └── user/feature-123-fix ← Branch with slash
+│ └── worktrees/ ← Worktree metadata
+│ ├── feature-auth/
+│ │ ├── HEAD ← Points to feature-auth
+│ │ └── index ← Separate staging area
+│ └── user-feature-123-fix/ ← Folder name (slash → hyphen)
+│ ├── HEAD ← Points to user/feature-123-fix
+│ └── index ← Separate staging area
 │
-├── .worktrees/                       # Worktrees directory
-│   └── feature-auth/                 # Your new worktree
-│       ├── .git       ← FILE (pointer, not directory)
-│       └── src/       ← Separate working files
+├── .worktrees/ # Worktrees directory
+│ ├── feature-auth/ # Flat folder name
+│ │ ├── .git ← FILE (pointer, not directory)
+│ │ └── src/ ← Separate working files
+│ └── jorge-TV-123-fix/ # Slashes converted to hyphens
+│ ├── .git ← FILE (pointer, not directory)
+│ └── src/ ← Separate working files
 │
-└── src/                              # Main worktree files
+└── src/ # Main worktree files
 ```
 
 ---
 
 ## What's Shared vs Isolated
 
-| Shared (All Worktrees)  | Isolated (Per Worktree)  |
-| ----------------------- | ------------------------ |
-| ✓ Commits               | ✓ Working files          |
-| ✓ Branches              | ✓ Staging area (index)   |
-| ✓ Tags                  | ✓ Current branch (HEAD)  |
-| ✓ Remotes               | ✓ Uncommitted changes    |
-| ✓ Config                | ✓ Reflog                 |
+| Shared (All Worktrees) | Isolated (Per Worktree) |
+| ---------------------- | ----------------------- |
+| ✓ Commits | ✓ Working files |
+| ✓ Branches | ✓ Staging area (index) |
+| ✓ Tags | ✓ Current branch (HEAD) |
+| ✓ Remotes | ✓ Uncommitted changes |
+| ✓ Config | ✓ Reflog |
 
 **Implication:**
 
@@ -195,16 +202,16 @@ $ wtn feature-payments
 
 ```
 Need to work on different branch?
-    │
-    ├─ YES → Do you have uncommitted changes?
-    │         │
-    │         ├─ YES → Use worktree! (wtn <branch>)
-    │         │        No stashing needed ✓
-    │         │
-    │         └─ NO → Worktree still useful for parallel work
-    │                 But could also just checkout
-    │
-    └─ NO → Stay on current branch
+│
+├─ YES → Do you have uncommitted changes?
+│ │
+│ ├─ YES → Use worktree! (wtn <branch>)
+│ │ No stashing needed ✓
+│ │
+│ └─ NO → Worktree still useful for parallel work
+│ But could also just checkout
+│
+└─ NO → Stay on current branch
 ```
 
 **Use worktrees when:**
@@ -221,37 +228,37 @@ Need to work on different branch?
 Total time from `wtn feature-auth` to ready environment:
 
 ```
-Validation:         0.1s
-System check:       0.3s
-Branch create:      0.1s
-Worktree create:    0.5s
-VSCode launch:      2.5s
-Terminal setup:     5.5s
+Validation: 0.1s
+System check: 0.3s
+Branch create: 0.1s
+Worktree create: 0.5s
+VSCode launch: 2.5s
+Terminal setup: 5.5s
 ───────────────────────
-Total:             ~9.0s
+Total: ~9.0s
 ```
 
 ---
 
 ## AppleScript Shortcuts Used
 
-| Action          | Shortcut                | What It Does                |
-| --------------- | ----------------------- | --------------------------- |
-| Open terminal   | `Ctrl + \``             | Opens integrated terminal   |
-| Split terminal  | `Ctrl + Opt + Cmd + º`  | Creates side-by-side panes  |
-| Switch pane     | `Opt + Cmd + →`         | Focus next terminal pane    |
+| Action | Shortcut | What It Does |
+| -------------- | ---------------------- | -------------------------- |
+| Open terminal | `Ctrl + \`` | Opens integrated terminal |
+| Split terminal | `Ctrl + Opt + Cmd + º` | Creates side-by-side panes |
+| Switch pane | `Opt + Cmd + →` | Focus next terminal pane |
 
 ---
 
 ## Troubleshooting Quick Fixes
 
-| Problem                      | Quick Fix                             |
-| ---------------------------- | ------------------------------------- |
-| "Not in git repo"            | `cd` to a git repository              |
-| "Branch exists in worktree"  | Use different name or `wtrm` old one  |
-| VSCode doesn't open          | Check: `which code`                   |
-| Terminals don't auto-setup   | Grant accessibility permissions       |
-| Claude doesn't start         | Check: `which claude`                 |
+| Problem | Quick Fix |
+| --------------------------- | ------------------------------------ |
+| "Not in git repo" | `cd` to a git repository |
+| "Branch exists in worktree" | Use different name or `wtrm` old one |
+| VSCode doesn't open | Check: `which code` |
+| Terminals don't auto-setup | Grant accessibility permissions |
+| Claude doesn't start | Check: `which claude` |
 
 **Full diagnostics:** `wtstatus`
 
@@ -299,19 +306,19 @@ Example repository: 100 MB
 
 ```
 Without worktree:
-├── .git/       50 MB
-└── files/      50 MB
-Total:         100 MB
+├── .git/ 50 MB
+└── files/ 50 MB
+Total: 100 MB
 
 With worktree:
-├── .git/       50 MB (shared!)
-├── files/      50 MB (main)
-└── worktree/   50 MB (duplicate files)
-Total:         150 MB
+├── .git/ 50 MB (shared!)
+├── files/ 50 MB (main)
+└── worktree/ 50 MB (duplicate files)
+Total: 150 MB
 
 vs. Cloning twice: 200 MB
 
-Space saved:    50 MB (25%)
+Space saved: 50 MB (25%)
 ```
 
 **Objects are shared**, only working files duplicated.
@@ -323,9 +330,9 @@ Space saved:    50 MB (25%)
 What `wtn feature-auth` actually runs:
 
 ```bash
-git branch feature-auth                    # Create branch from HEAD
-git worktree add .worktrees/feature-auth feature-auth  # Create worktree
-code .worktrees/feature-auth               # Open VSCode
+git branch feature-auth # Create branch from HEAD
+git worktree add .worktrees/feature-auth feature-auth # Create worktree
+code .worktrees/feature-auth # Open VSCode
 # ... AppleScript automation ...
 ```
 
@@ -375,10 +382,10 @@ wtls
 
 ## Further Reading
 
-| Document                   | What It Covers                             |
-| -------------------------- | ------------------------------------------ |
-| [README.md](./README.md)   | Complete features, installation, examples  |
-| [INSTALL.md](./INSTALL.md) | Setup and troubleshooting                  |
+| Document | What It Covers |
+| -------------------------- | ----------------------------------------- |
+| [README.md](./README.md) | Complete features, installation, examples |
+| [INSTALL.md](./INSTALL.md) | Setup and troubleshooting |
 
 ---
 
