@@ -11,6 +11,7 @@ This plugin embodies the principle that great tools should be **invisible**—th
 - 🚀 **One Command Setup**: Create branch + worktree + VSCode + Claude terminals in one go
 - 📁 **Organized Structure**: All worktrees in `.worktrees/` folder (auto-added to .gitignore)
 - 🖥️ **Automated IDE**: Opens VSCode with 2 terminals, Claude auto-starting in one
+- 🔧 **Smart File Handling**: Auto-copies .env files and .husky hooks to each worktree
 - 🎨 **Beautiful Output**: Color-coded feedback with clear status indicators
 - 🧹 **Clean Management**: Easy list, remove, and cleanup commands
 - ⚡ **Fast Context Switch**: Jump between worktrees instantly
@@ -23,20 +24,20 @@ This plugin embodies the principle that great tools should be **invisible**—th
 
 ```bash
 # If you've symlinked (already done):
-# ~/.oh-my-zsh/custom/plugins/git-worktree -> /path/to/git-worktree-zsh-plugin
+# ~/.oh-my-zsh/custom/plugins/git-worktree -> ~/dev/git-worktree-zsh-plugin
 
 # Or clone directly:
-git clone https://github.com/JdeJ/git-worktree-zsh-plugin \
-  ~/.oh-my-zsh/custom/plugins/git-worktree
+git clone https://github.com/yourusername/git-worktree-zsh-plugin \
+~/.oh-my-zsh/custom/plugins/git-worktree
 ```
 
 2. Enable the plugin in your `~/.zshrc`:
 
 ```bash
 plugins=(
-  git
-  git-worktree  # Add this
-  # ... other plugins
+git
+git-worktree # Add this
+# ... other plugins
 )
 ```
 
@@ -118,9 +119,15 @@ wtn hotfix-urgent main
 # → Creating branch from 'main'
 # → Creating branch 'hotfix-urgent'...
 # → Creating worktree at .worktrees/hotfix-urgent...
+# → Setting up gitignored configs and environment files...
+# • Copying .husky/ (including hook scripts)
+# • Copying .env
+# • Copying .env.local
 # → Opening VSCode...
-# → Setting up terminals with Claude...
+# → Setting up fullscreen and terminal with Claude...
 # ✓ Success! Worktree 'hotfix-urgent' is ready
+# Location: /Users/you/project/.worktrees/hotfix-urgent
+# Claude is starting in the terminal
 ```
 
 **What it does:**
@@ -129,11 +136,14 @@ wtn hotfix-urgent main
 2. ✓ Validates you're in a git repository
 3. ✓ Auto-detects base branch (main/master) or uses specified branch
 4. ✓ Creates new branch from base branch (defaults to main/master)
-5. ✓ Creates worktree in `.worktrees/<branch-name>`
+5. ✓ Creates worktree in `.worktrees/<folder-name>` (slashes in branch names become hyphens)
 6. ✓ Adds `.worktrees/` to `.gitignore` (first time)
-7. ✓ Opens VSCode at the worktree location
-8. ✓ Splits terminal and starts Claude
-9. ✓ Leaves you with a clean terminal alongside Claude
+7. ✓ Copies gitignored files you need:
+- `.husky/` directory (including `_/` subdirectory with hook scripts)
+- `.env*` files (`.env`, `.env.local`, `.env.development`, etc.)
+8. ✓ Opens VSCode at the worktree location
+9. ✓ Opens integrated terminal and starts Claude
+10. ✓ Leaves you with a fully configured environment
 
 **Base Branch Behavior:**
 
@@ -148,9 +158,9 @@ Beautifully formatted list of all active worktrees:
 ```bash
 wtls
 # Active worktrees:
-#   /Users/you/project            abc123f [main]
-#   /Users/you/project/.worktrees/feature-auth  def456g [feature-auth]
-#   /Users/you/project/.worktrees/bugfix-login  ghi789h [bugfix-login]
+# /Users/you/project abc123f [main]
+# /Users/you/project/.worktrees/feature-auth def456g [feature-auth]
+# /Users/you/project/.worktrees/bugfix-login ghi789h [bugfix-login]
 ```
 
 ### `wtrm <branch-name>` - Remove Worktree
@@ -248,17 +258,57 @@ wtn feature-payments
 # → Both running independently!
 ```
 
+## Environment & Configuration File Handling
+
+One of the key challenges with git worktrees is that **gitignored files aren't copied**. This plugin solves that automatically:
+
+### Copied Files
+
+These files are **copied** from the main worktree to each new worktree:
+
+**Git Hooks (`.husky/`):**
+
+- The entire `.husky/` directory, including the `_/` subdirectory
+- Ensures pre-commit hooks, commit-msg hooks, and other git hooks work in every worktree
+- Fixes the common issue where `.husky/_/` doesn't get copied (underscore directory is typically gitignored)
+
+**Environment Files:**
+
+- `.env` - Main environment variables
+- `.env.local` - Local overrides
+- `.env.development` - Development environment
+- `.env.test` - Test environment
+- `.env.production` - Production environment
+
+**Note:** Each worktree gets its own independent copies of these files, allowing you to customize environment variables per worktree if needed.
+
+### Files Handled by Git
+
+These files are automatically available (tracked by git):
+
+- All source code
+- `package.json`, `package-lock.json`, `yarn.lock`, etc.
+- Configuration files like `.prettierrc`, `tsconfig.json`, etc.
+- `CLAUDE.md` (if tracked by git)
+
 ## Directory Structure
 
 ```
-myapp/                          # Main repo
-├── .git/                       # Shared git directory
-├── .gitignore                  # Auto-includes .worktrees/
-├── .worktrees/                 # All worktrees here
-│   ├── feature-auth/           # Feature branch worktree
-│   ├── hotfix-bug/             # Hotfix worktree
-│   └── review-pr/              # PR review worktree
-├── src/                        # Your main branch code
+myapp/ # Main repo
+├── .git/ # Shared git directory
+├── .gitignore # Auto-includes .worktrees/
+├── .husky/ # Git hooks (copied to worktrees)
+│ └── _/ # Hook scripts (copied to worktrees)
+├── .env # Environment files (copied to worktrees)
+├── .env.local
+├── .worktrees/ # All worktrees here
+│ ├── feature-auth/ # Feature branch worktree
+│ │ ├── .husky/ # ← Copied from main
+│ │ ├── .env # ← Copied from main
+│ │ └── src/ # Git-tracked files
+│ ├── hotfix-bug/ # Hotfix worktree
+│ └── user-feature-123-fix/ # Branch name with slash (user/feature-123-fix)
+├── src/ # Your main branch code
 └── ...
 ```
 
@@ -323,10 +373,12 @@ $ wtn hotfix-urgent main
 
 Use descriptive, hierarchical names:
 
-- `feature/user-auth`
-- `bugfix/login-redirect`
-- `hotfix/security-patch`
-- `review/pr-123`
+- `feature/user-auth` → Creates folder: `.worktrees/feature-user-auth`
+- `bugfix/login-redirect` → Creates folder: `.worktrees/bugfix-login-redirect`
+- `hotfix/security-patch` → Creates folder: `.worktrees/hotfix-security-patch`
+- `user/feature-123-fix` → Creates folder: `.worktrees/user-feature-123-fix`
+
+**Note:** Slashes in branch names are automatically converted to hyphens in folder names to maintain a flat, organized structure while preserving the original git branch name.
 
 ### Cleanup Routine
 
@@ -349,9 +401,9 @@ For the best experience, ensure VSCode terminal integration is configured:
 
 ```json
 {
-  "terminal.integrated.automationProfile.osx": {
-    "path": "/bin/zsh"
-  }
+"terminal.integrated.automationProfile.osx": {
+"path": "/bin/zsh"
+}
 }
 ```
 
@@ -396,6 +448,14 @@ If `wtrm` can't find worktree:
 - May be outside `.worktrees/` if created manually
 - Use full path: `git worktree remove /full/path`
 
+### Missing .env or .husky Files
+
+If your worktree is missing environment files or git hooks:
+
+- Make sure they exist in the main worktree before creating new worktrees
+- Older worktrees created before this feature won't have these files
+- Solution: Manually copy them or recreate the worktree
+
 ## Philosophy & Design Decisions
 
 ### Why `.worktrees/` folder?
@@ -416,25 +476,6 @@ If `wtrm` can't find worktree:
 - **Integration**: Best terminal + editor integration
 - **Workspaces**: Each worktree becomes its own workspace
 - **Extensions**: Your setup works everywhere automatically
-
-## Claude Tip
-
-When creating a new workspace we are adding a new project configuration to the .claude.json file, so we loose our current project configurations including the mcp's. You can create a file called **.mcp.json** in your project base folder and add there all the mcp's server you want to share between all your worktrees.
-```
-{
-  "mcpServers": {
-    "mcp_server_name": {
-      "type": "sse",
-      "url": "https://mcp_serser_url/sse"
-    }
-  }
-}
-```
-Remember to add this file to .gitgnore
-```
-# MCP configuration (contains sensitive credentials)
-.mcp.json
-```
 
 ## Contributing
 
