@@ -1,0 +1,41 @@
+{
+  "copyFiles": {
+    "enabled": true,
+    "patterns": [
+      {
+        "path": ".husky/",
+        "type": "directory",
+        "description": "Git hooks directory"
+      },
+      {
+        "path": "**/.env*",
+        "type": "glob",
+        "description": "All .env files (respects .gitignore)"
+      },
+      {
+        "path": ".clauderc",
+        "type": "file",
+        "description": "Claude Code configuration"
+      },
+      {
+        "path": ".vscode/settings.json",
+        "type": "file",
+        "description": "VSCode workspace settings"
+      }
+    ]
+  },
+
+  "features": {
+    "installDependencies": true,
+    "openVSCode": true,
+    "startClaude": true,
+    "splitTerminal": true
+  },
+
+  "defaults": {
+    "baseBranch": "main",
+    "worktreeDirectory": ".worktrees"
+  },
+
+  "customCommand": ""
+}

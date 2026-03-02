@@ -10,10 +10,63 @@ This plugin embodies the principle that great tools should be **invisible**—th
 
 - 🚀 **One Command Setup**: Create branch + worktree + VSCode + Claude terminals in one go
 - 📁 **Organized Structure**: All worktrees in `.worktrees/` folder (auto-added to .gitignore)
-- 🖥️ **Automated IDE**: Opens VSCode with 2 terminals, Claude auto-starting in one
+- 🖥️ **Automated IDE**: Opens VSCode with 2 terminals - Claude ready, dependencies auto-installing
+- 🔧 **Smart File Handling**: Auto-copies all .env files recursively and .husky hooks to each worktree
+- 📦 **Auto Dependencies**: Detects package manager (pnpm/bun/yarn/npm) and auto-installs dependencies
+- ⚙️ **Configurable**: Per-repository `.config.json` to customize file copying and automation features
 - 🎨 **Beautiful Output**: Color-coded feedback with clear status indicators
 - 🧹 **Clean Management**: Easy list, remove, and cleanup commands
 - ⚡ **Fast Context Switch**: Jump between worktrees instantly
+
+## Configuration
+
+Customize behavior per-repository with a `.config.json` file in your repository root.
+
+**Why configure?** Different projects have different needs:
+
+- **Copy essential files**: `.env`, `.clauderc`, VSCode settings, and more
+- **Control automation**: Enable/disable dependencies install, VSCode opening, Claude startup
+- **Set defaults**: Custom base branch, worktree directory location
+
+**Example configuration:**
+
+```json
+{
+  "copyFiles": {
+    "enabled": true,
+    "patterns": [
+      { "path": ".husky/", "type": "directory", "description": "Git hooks" },
+      { "path": "**/.env*", "type": "glob", "description": "All .env files" },
+      { "path": ".clauderc", "type": "file", "description": "Claude config" },
+      {
+        "path": ".vscode/settings.json",
+        "type": "file",
+        "description": "VSCode"
+      }
+    ]
+  },
+  "features": {
+    "installDependencies": true, // Auto-install with detected package manager
+    "openVSCode": true, // Open VSCode automatically
+    "startClaude": true, // Start Claude in terminal
+    "splitTerminal": true // Split terminal (Claude + install)
+  },
+  "defaults": {
+    "baseBranch": "main", // Default base for new branches
+    "worktreeDirectory": ".worktrees" // Where to create worktrees
+  },
+  "customCommand": "" // Optional: Run custom command after setup
+}
+```
+
+**Configuration options:**
+
+- **No config?** Uses sensible defaults (copies `.husky/` and `.env*`, all features enabled)
+- **Custom command:** Run your own script/command after worktree setup completes
+- **Commit it:** Share configuration with your team
+- **Gitignore it:** Keep configuration personal
+
+**See [CONFIGURATION.md](./CONFIGURATION.md) for complete guide with examples for different workflows.**
 
 ## Installation
 
@@ -27,16 +80,16 @@ This plugin embodies the principle that great tools should be **invisible**—th
 
 # Or clone directly:
 git clone https://github.com/yourusername/git-worktree-zsh-plugin \
-  ~/.oh-my-zsh/custom/plugins/git-worktree
+~/.oh-my-zsh/custom/plugins/git-worktree
 ```
 
 2. Enable the plugin in your `~/.zshrc`:
 
 ```bash
 plugins=(
-  git
-  git-worktree  # Add this
-  # ... other plugins
+git
+git-worktree # Add this
+# ... other plugins
 )
 ```
 
@@ -100,13 +153,21 @@ wtstatus
 The star of the show. Creates everything you need for parallel development:
 
 ```bash
-# Create from current HEAD (default)
+# Create new branch from main (auto-detected)
 wtn feature-auth
 
-# Create from specific branch (e.g., main)
+# Use existing branch (if it exists)
+wtn feature-auth # Uses existing branch instead of creating new one
+
+# Create from specific base branch
+wtn hotfix-urgent main
+```
+
+**Example output (new branch):**
+
+```bash
 wtn hotfix-urgent main
 
-# Example output:
 # Checking requirements...
 # ✓ Git repository detected
 # ✓ Git 2.39.5 (worktree support)
@@ -118,9 +179,54 @@ wtn hotfix-urgent main
 # → Creating branch from 'main'
 # → Creating branch 'hotfix-urgent'...
 # → Creating worktree at .worktrees/hotfix-urgent...
+# → Setting up gitignored configs and environment files...
+# • Copying .husky/ (including hook scripts)
+# • Finding all .env files (respecting .gitignore)...
+# • Copying .env
+# • Copying apps/frontend/.env
+# ✓ Copied 2 .env file(s)
+# → Detected package manager: pnpm
 # → Opening VSCode...
-# → Setting up terminals with Claude...
+# → Setting up fullscreen and terminal with Claude...
 # ✓ Success! Worktree 'hotfix-urgent' is ready
+# Location: /Users/you/project/.worktrees/hotfix-urgent
+# Claude is running in the left terminal
+# Installing dependencies with pnpm in the right terminal
+```
+
+**Example output (existing branch with remote):**
+
+```bash
+wtn feature-auth
+
+# Checking requirements...
+# ✓ All systems ready!
+#
+# → Branch 'feature-auth' already exists, creating worktree from it
+# → Setting up tracking with origin/feature-auth
+# → Creating worktree at .worktrees/feature-auth...
+# → Setting up gitignored configs and environment files...
+# • Copying .husky/ (including hook scripts)
+# • Finding all .env files (respecting .gitignore)...
+# ✓ Copied 2 .env file(s)
+# → Detected package manager: pnpm
+# → Opening VSCode...
+# → Setting up fullscreen and terminal with Claude...
+# ✓ Success! Worktree 'feature-auth' is ready
+# Location: /Users/you/project/.worktrees/feature-auth
+# Claude is running in the left terminal
+# Installing dependencies with pnpm in the right terminal
+```
+
+**Example output (existing branch without remote):**
+
+```bash
+wtn local-branch
+
+# → Branch 'local-branch' already exists, creating worktree from it
+# ℹ No upstream configured - use 'git push -u origin local-branch' for first push
+# → Creating worktree at .worktrees/local-branch...
+# ...
 ```
 
 **What it does:**
@@ -128,18 +234,39 @@ wtn hotfix-urgent main
 1. ✓ Checks system requirements (Git, VSCode, Claude, etc.)
 2. ✓ Validates you're in a git repository
 3. ✓ Auto-detects base branch (main/master) or uses specified branch
-4. ✓ Creates new branch from base branch (defaults to main/master)
-5. ✓ Creates worktree in `.worktrees/<branch-name>`
+4. ✓ **Smart branch handling:**
+
+- If branch exists: Uses existing branch for worktree
+- If branch doesn't exist: Creates new branch from base branch (defaults to main/master)
+
+5. ✓ Creates worktree in `.worktrees/<folder-name>` (slashes in branch names become hyphens)
 6. ✓ Adds `.worktrees/` to `.gitignore` (first time)
-7. ✓ Opens VSCode at the worktree location
-8. ✓ Splits terminal and starts Claude
-9. ✓ Leaves you with a clean terminal alongside Claude
+7. ✓ Copies gitignored files you need:
 
-**Base Branch Behavior:**
+- `.husky/` directory (including `_/` subdirectory with hook scripts)
+- All `.env*` files recursively (e.g., `.env`, `apps/frontend/.env`, etc.) while respecting .gitignore
 
-- If no base branch specified: Auto-detects `main` or `master` (in that order)
+8. ✓ Detects package manager (pnpm, bun, yarn, npm) from lockfiles
+9. ✓ Opens VSCode at the worktree location
+10. ✓ Opens two integrated terminals:
+
+- **Left terminal**: Starts Claude automatically
+- **Right terminal**: Auto-installs dependencies with detected package manager
+
+11. ✓ Runs custom command if configured (e.g., open alternative terminal, run setup script)
+12. ✓ Leaves you with a fully configured environment ready for development
+
+**Branch Behavior:**
+
+- **Existing branch**: If the branch already exists (not in a worktree), it will be used for the new worktree
+- **Automatic upstream tracking**: If the branch exists remotely, automatically sets up tracking
+- **Local-only branch**: If no remote branch exists, shows a helpful reminder to use `git push -u`
+- **New branch**: If the branch doesn't exist, it will be created from base branch
+- **Base branch** (only applies to new branches):
+- If no base specified: Auto-detects `main` or `master` (in that order)
 - If neither exists: Uses current HEAD
 - Specify base explicitly: `wtn hotfix-urgent main`
+- **Already in worktree**: If branch already exists in another worktree, shows error
 
 ### `wtls` - List Worktrees
 
@@ -148,9 +275,9 @@ Beautifully formatted list of all active worktrees:
 ```bash
 wtls
 # Active worktrees:
-#   /Users/you/project            abc123f [main]
-#   /Users/you/project/.worktrees/feature-auth  def456g [feature-auth]
-#   /Users/you/project/.worktrees/bugfix-login  ghi789h [bugfix-login]
+# /Users/you/project abc123f [main]
+# /Users/you/project/.worktrees/feature-auth def456g [feature-auth]
+# /Users/you/project/.worktrees/bugfix-login ghi789h [bugfix-login]
 ```
 
 ### `wtrm <branch-name>` - Remove Worktree
@@ -196,6 +323,22 @@ For Oh-My-Zsh git plugin compatibility:
 
 ## Workflow Examples
 
+### Resume Work on Existing Branch
+
+```bash
+# You created a branch earlier but aren't working on it
+git branch
+# * main
+# feature-auth ← Exists but not checked out
+
+# Need to work on it in isolation
+wtn feature-auth
+# → Automatically detects existing branch
+# → Creates worktree from current state of feature-auth
+# → Opens VSCode with full setup
+# → Resume work immediately!
+```
+
 ### Urgent Hotfix While on Feature Branch
 
 ```bash
@@ -206,7 +349,7 @@ git checkout feature-payments
 
 # Production breaks! Need hotfix based on main
 wtn hotfix-critical-bug main
-# → Creates branch from main (not feature-payments!)
+# → Creates NEW branch from main (not feature-payments!)
 # → Opens VSCode with clean environment
 # → Make fixes, test, commit, push
 # → Close VSCode
@@ -248,17 +391,84 @@ wtn feature-payments
 # → Both running independently!
 ```
 
+## Environment & Configuration File Handling
+
+One of the key challenges with git worktrees is that **gitignored files aren't copied**. This plugin solves that automatically:
+
+### Copied Files
+
+These files are **copied** from the main worktree to each new worktree:
+
+**Git Hooks (`.husky/`):**
+
+- The entire `.husky/` directory, including the `_/` subdirectory
+- Ensures pre-commit hooks, commit-msg hooks, and other git hooks work in every worktree
+- Fixes the common issue where `.husky/_/` doesn't get copied (underscore directory is typically gitignored)
+
+**Environment Files:**
+
+The plugin automatically finds and copies **all `.env` files** throughout your repository:
+
+- Root level: `.env`, `.env.local`, `.env.development`, `.env.test`, `.env.production`
+- Subdirectories: `apps/frontend/.env`, `packages/api/.env.local`, etc.
+- **Respects .gitignore**: Won't search in ignored directories like `node_modules/`
+
+**Note:** Each worktree gets its own independent copies of these files, allowing you to customize environment variables per worktree if needed.
+
+### Package Manager Detection & Auto-Install
+
+The plugin automatically detects your package manager and installs dependencies in the new worktree:
+
+**Detection Priority** (checks for lockfiles):
+
+1. `pnpm-lock.yaml` → runs `pnpm install`
+2. `bun.lockb` → runs `bun install`
+3. `yarn.lock` → runs `yarn install`
+4. `package-lock.json` → runs `npm install`
+5. Only `package.json` → defaults to `npm install`
+
+**Installation:**
+
+- Runs automatically in the right terminal of VSCode
+- Silent mode for cleaner output
+- If package manager not in PATH, shows helpful message
+- Skips installation if no package.json found
+
+### Files Handled by Git
+
+These files are automatically available (tracked by git):
+
+- All source code
+- `package.json`, `package-lock.json`, `yarn.lock`, etc.
+- Configuration files like `.prettierrc`, `tsconfig.json`, etc.
+- `CLAUDE.md` (if tracked by git)
+
 ## Directory Structure
 
 ```
-myapp/                          # Main repo
-├── .git/                       # Shared git directory
-├── .gitignore                  # Auto-includes .worktrees/
-├── .worktrees/                 # All worktrees here
-│   ├── feature-auth/           # Feature branch worktree
-│   ├── hotfix-bug/             # Hotfix worktree
-│   └── review-pr/              # PR review worktree
-├── src/                        # Your main branch code
+myapp/ # Main repo
+├── .git/ # Shared git directory
+├── .gitignore # Auto-includes .worktrees/
+├── .husky/ # Git hooks (copied to worktrees)
+│ └── _/ # Hook scripts (copied to worktrees)
+├── .env # Root env file (copied to worktrees)
+├── .env.local # Root env override (copied to worktrees)
+├── apps/
+│ └── frontend/
+│ └── .env # Subdirectory env (copied to worktrees)
+├── .worktrees/ # All worktrees here
+│ ├── feature-auth/ # Feature branch worktree
+│ │ ├── .husky/ # ← Copied from main
+│ │ ├── .env # ← Copied from main root
+│ │ ├── .env.local # ← Copied from main root
+│ │ ├── apps/
+│ │ │ └── frontend/
+│ │ │ └── .env # ← Copied from main subdirectory
+│ │ ├── node_modules/ # ← Auto-installed
+│ │ └── src/ # Git-tracked files
+│ ├── hotfix-bug/ # Hotfix worktree
+│ └── user-feature-123-fix/ # Branch name with slash (user/feature-123-fix)
+├── src/ # Your main branch code
 └── ...
 ```
 
@@ -274,12 +484,46 @@ myapp/                          # Main repo
 
 ### Understanding Git Worktree Behavior
 
-**Base Branch Selection:**
+**Existing vs New Branches:**
 
-By default, `wtn` creates branches from `main` (or `master` if `main` doesn't exist):
+`wtn` is smart about branches - it uses existing branches or creates new ones as needed:
 
 ```bash
-# Auto-detects main/master
+# Branch doesn't exist → creates new branch
+$ wtn feature-new
+# → Creates feature-new from main ✓
+
+# Branch already exists → uses existing branch
+$ wtn feature-new
+# → Uses existing feature-new branch ✓
+# → Creates worktree from its current state ✓
+# → Auto-configures upstream tracking if remote exists ✓
+```
+
+**Automatic Upstream Tracking:**
+
+When using an existing branch, `wtn` automatically sets up upstream tracking:
+
+```bash
+# Branch exists locally and remotely
+$ wtn feature-auth
+# → Setting up tracking with origin/feature-auth ✓
+# Now git pull/push work without -u flag!
+
+# Branch exists only locally
+$ wtn local-feature
+# ℹ No upstream configured - use 'git push -u origin local-feature' for first push
+# Helpful reminder shown
+```
+
+This eliminates the common "no upstream branch" error when pushing/pulling!
+
+**Base Branch Selection (for new branches only):**
+
+When creating a NEW branch, `wtn` defaults to `main` (or `master` if `main` doesn't exist):
+
+```bash
+# Auto-detects main/master for new branches
 $ wtn feature-new
 # → Creates feature-new from main ✓
 
@@ -301,7 +545,7 @@ $ git branch
 
 # Need hotfix based on main? Easy!
 $ wtn hotfix-urgent main
-# → Creates from main, not feature-payments ✓
+# → Creates NEW branch from main, not feature-payments ✓
 # → Your uncommitted work stays untouched ✓
 ```
 
@@ -323,10 +567,12 @@ $ wtn hotfix-urgent main
 
 Use descriptive, hierarchical names:
 
-- `feature/user-auth`
-- `bugfix/login-redirect`
-- `hotfix/security-patch`
-- `review/pr-123`
+- `feature/user-auth` → Creates folder: `.worktrees/feature-user-auth`
+- `bugfix/login-redirect` → Creates folder: `.worktrees/bugfix-login-redirect`
+- `hotfix/security-patch` → Creates folder: `.worktrees/hotfix-security-patch`
+- `user/feature-123-fix` → Creates folder: `.worktrees/user-feature-123-fix`
+
+**Note:** Slashes in branch names are automatically converted to hyphens in folder names to maintain a flat, organized structure while preserving the original git branch name.
 
 ### Cleanup Routine
 
@@ -385,8 +631,10 @@ If terminals don't auto-setup:
 
 Error: "Branch already exists in a worktree"
 
-- Each branch can only be checked out in ONE worktree
-- Solution: Use `wtls` to find existing worktree, or create a new branch name
+- Each branch can only be checked out in ONE worktree at a time
+- Solution: Use `wtls` to find the existing worktree, or use a different branch name
+
+**Note:** If a branch exists but is NOT in a worktree, `wtn` will automatically use it - no error!
 
 ### Worktree Not Found
 
@@ -395,6 +643,14 @@ If `wtrm` can't find worktree:
 - Check actual location with `wtls`
 - May be outside `.worktrees/` if created manually
 - Use full path: `git worktree remove /full/path`
+
+### Missing .env or .husky Files
+
+If your worktree is missing environment files or git hooks:
+
+- Make sure they exist in the main worktree before creating new worktrees
+- Older worktrees created before this feature won't have these files
+- Solution: Manually copy them or recreate the worktree
 
 ## Philosophy & Design Decisions
 
@@ -425,6 +681,12 @@ Improvements welcome! This plugin was crafted with obsessive attention to:
 - **Reliability**: Extensive validation and error handling
 - **Beauty**: Color-coded output with meaningful symbols
 - **Thoughtfulness**: Anticipating what users need next
+
+## Documentation
+
+- **[CONFIGURATION.md](./CONFIGURATION.md)** - Complete configuration guide with examples
+- **[QUICK-REFERENCE.md](./QUICK-REFERENCE.md)** - Visual cheat sheet and command reference
+- **[INSTALL.md](./INSTALL.md)** - Installation and setup troubleshooting
 
 ## License
 

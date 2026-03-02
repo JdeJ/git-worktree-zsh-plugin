@@ -5,25 +5,62 @@ The plugin has been installed and enabled in your shell.
 ## Quick Start
 
 1. **Reload your shell:**
-      `bash
-   source ~/.zshrc
-   `
+
+```bash
+source ~/.zshrc
+```
 
 2. **Navigate to a git repository:**
-      `bash
-   cd ~/path/to/your/project
-   `
+
+```bash
+cd ~/path/to/your/project
+```
 
 3. **Create your first worktree:**
-      `bash
-   wtn feature-test
-   `
+
+```bash
+wtn feature-test
+```
 
 This will:
-   - Create a new branch `feature-test`
-   - Create worktree in `.worktrees/feature-test`
-   - Open VSCode with 2 terminals
-   - Start Claude in the left terminal
+
+- Create a new branch `feature-test`
+- Create worktree in `.worktrees/feature-test`
+- Copy all `.env` files and `.husky/` directory (default behavior)
+- Detect package manager (pnpm/bun/yarn/npm)
+- Open VSCode with 2 terminals
+- Start Claude in the left terminal
+- Auto-install dependencies in the right terminal
+
+4. **(Optional) Configure per-repository:**
+
+```bash
+# Create .config.json in your repository root
+cat > .config.json <<'EOF'
+{
+"copyFiles": {
+"enabled": true,
+"patterns": [
+{ "path": ".husky/", "type": "directory" },
+{ "path": "**/.env*", "type": "glob" },
+{ "path": ".clauderc", "type": "file" }
+]
+},
+"features": {
+"installDependencies": true,
+"openVSCode": true,
+"startClaude": true,
+"splitTerminal": true
+},
+"defaults": {
+"baseBranch": "main",
+"worktreeDirectory": ".worktrees"
+}
+}
+EOF
+```
+
+**See [CONFIGURATION.md](./CONFIGURATION.md) for complete configuration guide.**
 
 ## Verify Installation
 
@@ -133,9 +170,14 @@ wtn test-branch
 #
 # → Creating branch 'test-branch'...
 # → Creating worktree at .worktrees/test-branch...
+# → Setting up gitignored configs and environment files...
+# → Detected package manager: npm
 # → Opening VSCode...
 # → Setting up terminals with Claude...
 # ✓ Success! Worktree 'test-branch' is ready
+# Location: ~/test-worktree/.worktrees/test-branch
+# Claude is running in the left terminal
+# Installing dependencies with npm in the right terminal
 ```
 
 ## Available Commands
@@ -164,11 +206,14 @@ This command checks all requirements and provides specific fix instructions for 
 - Check: `which code`
 - Install: VSCode Command Palette → "Install 'code' command"
 
-### Terminals don't auto-create
+### Terminals don't auto-create or split
 
 - Grant accessibility permissions (see above)
 - VSCode must be fully loaded (plugin waits 2.5s)
-- Fallback: Manually press `⌃\`` then your split terminal shortcut
+- **Split method**: Plugin uses Command Palette (Cmd+Shift+P → "Terminal: Split Terminal")
+- Works with all keyboard layouts (no physical key codes)
+- If Command Palette is slow, increase delays in the AppleScript section
+- Fallback: Manually press ` ⌃\`` then use Command Palette (Cmd+Shift+P) → type "split" → select "Terminal: Split Terminal", run  `claude` in left and your package manager install command in right
 
 ### Claude doesn't start
 
@@ -182,6 +227,20 @@ This command checks all requirements and provides specific fix instructions for 
 - Verify: `ls -la $ZSH_CUSTOM/plugins/git-worktree`
 - Reload: `source ~/.zshrc`
 
+### Configuration not working
+
+- Verify config file location: `.config.json` must be in repository root
+- Check JSON syntax: Use `cat .config.json | jq .` to validate
+- Test with defaults: Remove `.config.json` temporarily to test with built-in defaults
+- View what's being used: Plugin will use defaults if config file is invalid
+
+### Files not being copied
+
+- Check `copyFiles.enabled` is `true` in `.config.json`
+- Verify paths are correct (relative to repository root)
+- Ensure files exist and are gitignored (use `git status --ignored`)
+- For glob patterns like `**/.env*`, files must be in gitignore
+
 ## Tips for Success
 
 1. **Use descriptive branch names**: `feature/`, `bugfix/`, `hotfix/`
@@ -191,9 +250,11 @@ This command checks all requirements and provides specific fix instructions for 
 
 ## Next Steps
 
-- Read the [README.md](./README.md) for comprehensive documentation
-- Check out workflow examples for parallel development
-- Customize the plugin for your specific needs
+- **[CONFIGURATION.md](./CONFIGURATION.md)** - Learn how to customize behavior per-repository
+- **[README.md](./README.md)** - Comprehensive documentation and features
+- **[QUICK-REFERENCE.md](./QUICK-REFERENCE.md)** - Visual cheat sheet and command reference
+- Check out configuration-based workflow examples for different scenarios
+- Commit `.config.json` to share team setup or add to `.gitignore` for personal use
 
 ---
 
