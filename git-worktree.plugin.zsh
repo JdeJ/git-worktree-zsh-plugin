@@ -559,15 +559,134 @@ unset WT_WORKTREE_PATH WT_BRANCH_NAME WT_PACKAGE_MANAGER WT_REPO_ROOT
 fi
 }
 
-# List all worktrees with elegant formatting
+# List all worktrees with rich table formatting
 wtls() {
 _wt_check_requirements "git-only" "false" || return 1
 
+# Detect the current worktree path for the "← current" indicator
+local current_path
+current_path=$(git rev-parse --show-toplevel 2>/dev/null)
+
+# Parse worktrees via porcelain format
+local -a wt_paths wt_branches
+local _path="" _branch="" _head=""
+
+while IFS= read -r _line; do
+case "$_line" in
+"worktree "*)
+[[ -n "$_path" ]] && {
+wt_paths+=("$_path")
+wt_branches+=("${_branch:-HEAD:${_head:0:7}}")
+_path="" _branch="" _head=""
+}
+_path="${_line#worktree }"
+;;
+"branch "*)
+_branch="${_line#branch refs/heads/}"
+;;
+"HEAD "*)
+_head="${_line#HEAD }"
+;;
+"")
+[[ -n "$_path" ]] && {
+wt_paths+=("$_path")
+wt_branches+=("${_branch:-HEAD:${_head:0:7}}")
+_path="" _branch="" _head=""
+}
+;;
+esac
+done < <(git worktree list --porcelain 2>/dev/null)
+# Capture final entry if not followed by blank line
+[[ -n "$_path" ]] && {
+wt_paths+=("$_path")
+wt_branches+=("${_branch:-HEAD:${_head:0:7}}")
+}
+
+local total=${#wt_paths[@]}
+if (( total == 0 )); then
+echo "${fg[yellow]}No worktrees found${reset_color}"
+return 1
+fi
+
+# Column widths (visible characters, excluding separators)
+local W_BRANCH=45 W_STATUS=8 W_COMMIT=22 W_CHANGES=12
+
 echo ""
-echo "${fg[cyan]}Active worktrees:${reset_color}"
-git worktree list | while IFS= read -r line; do
-echo " $line"
+
+# Header — colors wrap the entire format string so %-Ns counts only raw text
+printf " ${fg_bold[white]}%-${W_BRANCH}s %-${W_STATUS}s %-${W_COMMIT}s %s${reset_color}\n" \
+"BRANCH" "STATUS" "LAST COMMIT" "CHANGES"
+echo ""
+
+local now
+now=$(date +%s)
+
+# Declare all loop variables up front — avoids zsh reprinting them on iterations 2+
+local p branch disp_branch commit_ts age_sec age_days age_str dot_color change_count
+
+for (( i=1; i<=total; i++ )); do
+p="${wt_paths[$i]}"
+branch="${wt_branches[$i]}"
+
+# Truncate branch name (right-truncate with …)
+disp_branch="$branch"
+(( ${#branch} > W_BRANCH )) && disp_branch="${branch:0:$(( W_BRANCH - 3 ))}..."
+
+# Last commit age
+commit_ts=$(git -C "$p" log -1 --format="%ct" 2>/dev/null)
+age_sec=0
+[[ -n "$commit_ts" ]] && age_sec=$(( now - commit_ts ))
+age_days=$(( age_sec / 86400 ))
+
+if (( age_sec < 60 )); then age_str="just now"
+elif (( age_sec < 3600 )); then age_str="$((age_sec / 60))m ago"
+elif (( age_sec < 86400 )); then age_str="$((age_sec / 3600))h ago"
+elif (( age_days < 7 )); then age_str="${age_days}d ago"
+elif (( age_days < 30 )); then age_str="$((age_days / 7))w ago"
+elif (( age_days < 365 )); then age_str="$((age_days / 30))mo ago"
+else age_str="$((age_days / 365))y ago"
+fi
+
+# Status dot color based on commit age
+if (( age_days <= 7 )); then dot_color="${fg[green]}"
+elif (( age_days <= 30 )); then dot_color="${fg[yellow]}"
+else dot_color="${fg[red]}"
+fi
+
+# Git change count (-uno skips untracked scan — much faster on large repos)
+change_count=$(git -C "$p" status --porcelain -uno 2>/dev/null | wc -l | tr -d ' ')
+change_count="${change_count:-0}"
+
+# ── Print row ──────────────────────────────────────────────────────────
+printf " "
+
+# BRANCH (cyan, padded via format string so alignment is on raw text)
+printf "${fg[cyan]}%-${W_BRANCH}s${reset_color} " "$disp_branch"
+
+# STATUS: colored dot + padding to fill W_STATUS
+printf "${dot_color}●${reset_color}"
+printf "%-$((W_STATUS - 1))s " ""
+
+# LAST COMMIT: "← current Xh ago" for current worktree, else just time
+if [[ "$p" == "$current_path" ]]; then
+# "← current" = 9 chars + 1 space = 10, remainder fills W_COMMIT
+printf "${fg[cyan]}← current${reset_color} %-$((W_COMMIT - 10))s " "$age_str"
+else
+printf "%-${W_COMMIT}s " "$age_str"
+fi
+
+# CHANGES
+if (( change_count > 0 )); then
+printf "${fg[yellow]}Dirty +${change_count}${reset_color}\n"
+else
+printf "${fg[green]}Clean${reset_color}\n"
+fi
 done
+
+# Footer legend
+echo ""
+printf " Total: ${total} worktree(s) | Legend: ${fg[green]}●${reset_color} Recent (≤7d) | ${fg[yellow]}●${reset_color} Medium (8-30d) | ${fg[red]}●${reset_color} Stale (30+d)\n"
+echo ""
 }
 
 # Remove worktree and optionally delete branch
